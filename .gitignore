@@ -1,11 +1,21 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# ============================================
+# FRONTEND (Next.js / Node.js)
+# ============================================
 
 # Dependencies
-node_modules
+node_modules/
 .pnp
 .pnp.js
 
-# Local env files
+# Build Outputs
+.next/
+out/
+build/
+dist/
+.turbo/
+.swc/
+
+# Environment Variables
 .env
 .env.local
 .env.development.local
@@ -13,24 +23,172 @@ node_modules
 .env.production.local
 
 # Testing
-coverage
-
-# Turbo
-.turbo
-
-# Vercel
-.vercel
-
-# Build Outputs
-.next/
-out/
-build
-dist
-
+coverage/
+.nyc_output/
 
 # Debug
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Misc
+# Vercel
+.vercel/
+
+# Package Manager Locks (keep these committed for reproducibility)
+# Uncomment if you want to ignore them:
+# pnpm-lock.yaml
+# bun.lockb
+# package-lock.json
+
+# ============================================
+# BACKEND (Python / FastAPI)
+# ============================================
+
+# Python Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / Packaging
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.whl
+develop-eggs/
+downloads/
+.installed.cfg
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+.env/
+
+# UV Package Manager
+.venv/
+# Keep uv.lock committed for reproducibility
+
+# Ruff Cache
+.ruff_cache/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+*.cover
+.hypothesis/
+
+# Database
+*.db
+*.sqlite3
+*.sqlite
+
+# Alembic
+# Keep migration files, ignore bytecode
+alembic/versions/*.pyc
+
+# FastAPI Specific
+*.pid
+instance/
+.webassets-cache
+
+# ============================================
+# DOCKER
+# ============================================
+
+# Docker Compose Override (for local dev customization)
+docker-compose.override.yml
+
+# Docker Volumes (if accidentally created locally)
+postgres_data/
+redis_data/
+
+# ============================================
+# IDE / EDITOR
+# ============================================
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# PyCharm / IntelliJ
+.idea/
+*.iml
+
+# Vim
+*.swp
+*.swo
+*~
+
+# Emacs
+*~
+\#*\#
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================
+# OS SPECIFIC
+# ============================================
+
+# macOS
 .DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+
+# ============================================
+# LOGS
+# ============================================
+
+*.log
+logs/
+*.log.*
+
+# ============================================
+# TEMPORARY FILES
+# ============================================
+
+*.tmp
+*.temp
+.cache/
+tmp/
+temp/
+
+# ============================================
+# MISC
+# ============================================
+
+# SSL Certificates
 *.pem
+*.key
+*.crt
+
+# Backup files
+*.bak
+*.backup
