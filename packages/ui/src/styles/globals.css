@@ -121,7 +121,27 @@
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
   }
+}
+
+
+/* .material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Custom color palette - Dark Grey/Black with White */
+/* @theme inline {
+  --color-primary: #ffffff;
+  --color-background-light: #f6f7f8;
+  --color-background-dark: #0a0a0a;
+  --font-display: Manrope, sans-serif;
+}
+
+*/
+
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
 }
