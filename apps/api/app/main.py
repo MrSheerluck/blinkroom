@@ -6,6 +6,8 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import AsyncSessionLocal
 
+from app.routers import rooms
+
 app = FastAPI(title="BlinkRoom API")
 
 # CORS middleware
@@ -16,6 +18,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# register routes
+app.include_router(rooms.router)
 
 
 @app.get("/health")
