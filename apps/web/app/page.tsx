@@ -11,10 +11,25 @@ export default function HomePage() {
   const handleCreateRoom = async () => {
     setIsCreating(true)
 
-    setTimeout(() => {
-      const mockRoomId = Math.random().toString(36).substring(7)
-      router.push(`/room/${mockRoomId}`)
-    }, 500)
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/rooms`, {
+        method: 'POST',
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create room')
+      }
+
+      const data = await response.json()
+      console.log('Room created:', data)
+
+      router.push(`/room/${data.id}`)
+    } catch (error) {
+      console.error('Error creating room:', error)
+      alert('Failed to create room. Please try again.')
+    } finally {
+      setIsCreating(false)
+    }
   }
 
   return (
