@@ -6,7 +6,7 @@ from sqlalchemy import text
 from app.config import settings
 from app.database import AsyncSessionLocal
 
-from app.routers import rooms
+from app.routers import rooms, websocket
 
 app = FastAPI(title="BlinkRoom API")
 
@@ -22,6 +22,7 @@ app.add_middleware(
 
 # register routes
 app.include_router(rooms.router)
+app.include_router(websocket.router)
 
 
 @app.get("/health")
@@ -32,12 +33,8 @@ async def health_check():
     - Database connectivity
     - Redis connectivity
     """
-    health_status = {
-        "api": "ok",
-        "database": "unknown",
-        "redis": "unknown"
-    }
-    
+    health_status = {"api": "ok", "database": "unknown", "redis": "unknown"}
+
     # Check database
     try:
         async with AsyncSessionLocal() as session:
@@ -45,7 +42,7 @@ async def health_check():
         health_status["database"] = "ok"
     except Exception as e:
         health_status["database"] = f"error: {str(e)}"
-    
+
     # Check Redis
     try:
         redis_client = redis.from_url(settings.redis_url)
@@ -54,7 +51,7 @@ async def health_check():
         health_status["redis"] = "ok"
     except Exception as e:
         health_status["redis"] = f"error: {str(e)}"
-    
+
     return health_status
 
 

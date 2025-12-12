@@ -1,8 +1,9 @@
 "use client"
 
 import { useParams } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import Link from "next/link"
+import { useWebSocket } from "@/hooks/useWebSocket"
 
 
 interface RoomDetail {
@@ -22,6 +23,18 @@ export default function RoomPage() {
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [timeRemaining, setTimeRemaining] = useState<string>("")
+    const [messageInput, setMessageInput] = useState("")
+
+    // WebSocket hook
+    const { messages, sendMessage, username, connectionStatus } = useWebSocket(roomId)
+
+    // Ref for auto-scroll
+    const messagesEndRef = useRef<HTMLDivElement>(null)
+
+    // Auto-scroll to bottom when new messages arrive
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    }, [messages])
 
 
     useEffect(() => {
@@ -81,6 +94,19 @@ export default function RoomPage() {
         return () => clearInterval(interval)
     }, [room])
 
+    const handleSendMessage = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (messageInput.trim() && connectionStatus === 'connected') {
+            sendMessage(messageInput)
+            setMessageInput("")
+        }
+    }
+
+    const formatTime = (timestamp: string) => {
+        const date = new Date(timestamp)
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
+    }
+
     if (loading) {
         return (
             <div className="flex min-h-screen items-center justify-center bg-black">
@@ -133,36 +159,92 @@ export default function RoomPage() {
                         <div className="text-sm text-zinc-400">
                             Expires in: <span className="text-blue-400 font-semibold">{timeRemaining}</span>
                         </div>
+                        {username && (
+                            <div className="text-sm text-zinc-400">
+                                You are: <span className="text-green-400 font-semibold">{username}</span>
+                            </div>
+                        )}
+                        <div className="flex items-center gap-2">
+                            <div className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' :
+                                    connectionStatus === 'connecting' ? 'bg-yellow-500' :
+                                        'bg-red-500'
+                                }`} />
+                            <span className="text-xs text-zinc-500 capitalize">{connectionStatus}</span>
+                        </div>
                     </div>
                 </div>
             </header>
 
             <main className="flex-1 flex flex-col max-w-6xl w-full mx-auto p-6">
                 {/* Chat messages area */}
-                <div className="flex-1 bg-zinc-900 rounded-lg border border-zinc-800 p-6 mb-4">
-                    <div className="text-center text-zinc-500 mt-20">
-                        <p className="text-lg">Chat interface coming in Step 3!</p>
-                        <p className="text-sm mt-2">WebSocket connection will be added next</p>
-                    </div>
+                <div className="flex-1 bg-zinc-900 rounded-lg border border-zinc-800 p-6 mb-4 overflow-y-auto">
+                    {messages.length === 0 ? (
+                        <div className="text-center text-zinc-500 mt-20">
+                            <p className="text-lg">No messages yet</p>
+                            <p className="text-sm mt-2">Be the first to say something!</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {messages.map((msg, index) => {
+                                if (msg.type === 'user_joined') {
+                                    return (
+                                        <div key={index} className="text-center text-zinc-500 text-sm">
+                                            <span className="text-green-400">{msg.username}</span> joined the room
+                                        </div>
+                                    )
+                                }
+                                if (msg.type === 'user_left') {
+                                    return (
+                                        <div key={index} className="text-center text-zinc-500 text-sm">
+                                            <span className="text-red-400">{msg.username}</span> left the room
+                                        </div>
+                                    )
+                                }
+                                if (msg.type === 'message') {
+                                    const isOwnMessage = msg.username === username
+                                    return (
+                                        <div key={msg.id || index} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                                            <div className={`max-w-md ${isOwnMessage ? 'bg-blue-600' : 'bg-zinc-800'} rounded-lg px-4 py-2`}>
+                                                <div className="flex items-baseline gap-2 mb-1">
+                                                    <span className={`font-semibold text-sm ${isOwnMessage ? 'text-blue-100' : 'text-zinc-300'}`}>
+                                                        {msg.username}
+                                                    </span>
+                                                    <span className="text-xs text-zinc-400">
+                                                        {formatTime(msg.timestamp)}
+                                                    </span>
+                                                </div>
+                                                <p className="text-white">{msg.contents}</p>
+                                            </div>
+                                        </div>
+                                    )
+                                }
+                                return null
+                            })}
+                            <div ref={messagesEndRef} />
+                        </div>
+                    )}
                 </div>
 
                 {/* Message input */}
-                <div className="bg-zinc-900 rounded-lg border border-zinc-800 p-4">
+                <form onSubmit={handleSendMessage} className="bg-zinc-900 rounded-lg border border-zinc-800 p-4">
                     <div className="flex gap-3">
                         <input
                             type="text"
-                            placeholder="Type a message... (WebSocket coming in Step 3)"
-                            disabled
+                            value={messageInput}
+                            onChange={(e) => setMessageInput(e.target.value)}
+                            placeholder={connectionStatus === 'connected' ? "Type a message..." : "Connecting..."}
+                            disabled={connectionStatus !== 'connected'}
                             className="flex-1 bg-zinc-800 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50"
                         />
                         <button
-                            disabled
+                            type="submit"
+                            disabled={connectionStatus !== 'connected' || !messageInput.trim()}
                             className="px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                         >
                             Send
                         </button>
                     </div>
-                </div>
+                </form>
             </main>
         </div>
     )

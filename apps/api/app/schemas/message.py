@@ -32,3 +32,33 @@ class Message(BaseModel):
     username: str
     contents: str
     timestamp: datetime
+
+
+class UserJoinedEvent(BaseModel):
+    """
+    Sent when someone joins the room.
+    """
+
+    type: MessageType = MessageType.USER_JOINED
+    username: str
+    timestamp: datetime
+
+
+class UserLeftEvent(BaseModel):
+    """
+    Sent when someone leaves the room.
+    """
+
+    type: MessageType = MessageType.USER_LEFT
+    username: str
+    timestamp: datetime
+
+
+class MessageHistory(BaseModel):
+    """
+    Schema for message history response.
+    """
+
+    type: MessageType = MessageType.MESSAGE_HISTORY
+    messages: list[Message]
+    username: str
