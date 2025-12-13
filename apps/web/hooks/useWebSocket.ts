@@ -29,8 +29,14 @@ export function useWebSocket(roomId: string): UseWebSocketReturn {
     const reconnectTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
     const connect = useCallback(() => {
+        // Don't create a new connection if one is already open
         if (wsRef.current?.readyState === WebSocket.OPEN) {
             return
+        }
+
+        // Close existing connection if it's in a bad state
+        if (wsRef.current && wsRef.current.readyState !== WebSocket.OPEN) {
+            wsRef.current.close()
         }
 
         setConnectionStatus('connecting')
@@ -47,20 +53,45 @@ export function useWebSocket(roomId: string): UseWebSocketReturn {
 
         ws.onmessage = (event) => {
             const data = JSON.parse(event.data)
+            console.log('Received message:', data.type, data.id || 'no-id')
 
             if (data.type === 'message_history') {
                 // Initial message history
                 setUsername(data.username)
                 setMessages(data.messages || [])
             } else if (data.type === 'message') {
-                // New message
-                setMessages(prev => [...prev, data])
+                // New message - check for duplicates before adding
+                setMessages(prev => {
+                    // Don't add if message with same ID already exists
+                    if (prev.some(msg => msg.id === data.id)) {
+                        return prev
+                    }
+                    return [...prev, data]
+                })
             } else if (data.type === 'user_joined') {
-                // User joined event
-                setMessages(prev => [...prev, data])
+                // User joined event - check for recent duplicate
+                setMessages(prev => {
+                    const lastMessage = prev[prev.length - 1]
+                    // Skip if last message was same user joining within 1 second
+                    if (lastMessage?.type === 'user_joined' &&
+                        lastMessage.username === data.username &&
+                        new Date(data.timestamp).getTime() - new Date(lastMessage.timestamp).getTime() < 1000) {
+                        return prev
+                    }
+                    return [...prev, data]
+                })
             } else if (data.type === 'user_left') {
-                // User left event
-                setMessages(prev => [...prev, data])
+                // User left event - check for recent duplicate
+                setMessages(prev => {
+                    const lastMessage = prev[prev.length - 1]
+                    // Skip if last message was same user leaving within 1 second
+                    if (lastMessage?.type === 'user_left' &&
+                        lastMessage.username === data.username &&
+                        new Date(data.timestamp).getTime() - new Date(lastMessage.timestamp).getTime() < 1000) {
+                        return prev
+                    }
+                    return [...prev, data]
+                })
             }
         }
 
@@ -72,6 +103,7 @@ export function useWebSocket(roomId: string): UseWebSocketReturn {
         ws.onclose = () => {
             console.log('WebSocket disconnected')
             setConnectionStatus('disconnected')
+            wsRef.current = null
 
             // Attempt to reconnect after 3 seconds
             reconnectTimeoutRef.current = setTimeout(() => {
@@ -92,7 +124,9 @@ export function useWebSocket(roomId: string): UseWebSocketReturn {
                 clearTimeout(reconnectTimeoutRef.current)
             }
             if (wsRef.current) {
+                console.log('Cleaning up WebSocket connection')
                 wsRef.current.close()
+                wsRef.current = null
             }
         }
     }, [connect])
