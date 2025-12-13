@@ -79,6 +79,9 @@ async def websocket_endpoint(websocket: WebSocket, room_id: str):
             await manager.broadcast_to_room(room_id, message.model_dump(mode="json"))
 
     except WebSocketDisconnect:
+        pass  # Normal disconnect
+    finally:
+        # Always cleanup, regardless of how we exited
         await manager.disconnect(room_id, user_id)
 
         left_event = UserLeftEvent(

@@ -5,6 +5,8 @@ Message service for storing and retrieving messages from Redis.
 import json
 from typing import Optional
 import redis.asyncio as redis
+import logging
+from pydantic import ValidationError
 
 from app.config import settings
 from app.schemas.message import Message
@@ -28,7 +30,7 @@ class MessageService:
 
     async def save_message(self, room_id: str, message: Message) -> None:
         """
-        Save a message to Redis.
+        Save a message to Redis with bounded list growth.
 
         Args:
             room_id: The room ID
@@ -40,13 +42,12 @@ class MessageService:
         # Convert message to JSON
         message_json = message.model_dump_json()
 
-        # Append to list
-        await client.rpush(key, message_json)
-
-        # Set TTL to 24 hours if not already set
-        ttl = await client.ttl(key)
-        if ttl == -1:  # No expiration set
-            await client.expire(key, 86400)  # 24 hours
+        # Use pipeline for atomic operation: RPUSH + LTRIM + EXPIRE
+        pipe = client.pipeline()
+        pipe.rpush(key, message_json)
+        pipe.ltrim(key, -500, -1)  # Keep last 500 messages
+        pipe.expire(key, 86400)  # Refresh TTL to 24 hours
+        await pipe.execute()
 
     async def get_room_messages(self, room_id: str, limit: int = 50) -> list[Message]:
         """
@@ -59,6 +60,7 @@ class MessageService:
         Returns:
             List of messages, ordered from oldest to newest
         """
+        logger = logging.getLogger(__name__)
         client = await self.get_redis()
         key = self._get_messages_key(room_id)
 
@@ -71,8 +73,8 @@ class MessageService:
             try:
                 msg_dict = json.loads(msg_json)
                 messages.append(Message(**msg_dict))
-            except Exception as e:
-                print(f"Error parsing message: {e}")
+            except (json.JSONDecodeError, ValidationError) as e:
+                logger.warning("Error parsing message from Redis: %s", e)
                 continue
 
         return messages

@@ -4,6 +4,7 @@ WebSocket connection manager with Redis Pub/Sub for multi-server support.
 
 import asyncio
 import json
+import logging
 from typing import Dict
 from fastapi import WebSocket
 import redis.asyncio as redis
@@ -22,13 +23,21 @@ class ConnectionManager:
         self.redis_client: redis.Redis | None = None
         self.pubsub: redis.client.PubSub | None = None
 
+        # Task management
+        self._listener_tasks: Dict[str, asyncio.Task] = {}
+
+        # Lock for thread-safe room creation
+        self._global_lock = asyncio.Lock()
+
     async def connect(self, room_id: str, user_id: str, websocket: WebSocket):
         """Add a user to a room."""
         await websocket.accept()
 
-        if room_id not in self.active_connections:
-            self.active_connections[room_id] = {}
-            await self._subscribe_to_room(room_id)
+        # Use lock to prevent race condition on concurrent joins
+        async with self._global_lock:
+            if room_id not in self.active_connections:
+                self.active_connections[room_id] = {}
+                await self._subscribe_to_room(room_id)
 
         self.active_connections[room_id][user_id] = websocket
 
@@ -61,24 +70,44 @@ class ConnectionManager:
         channel = f"room:{room_id}"
         await self.pubsub.subscribe(channel)
 
-        # Start listening in background
-        asyncio.create_task(self._listen_to_redis(room_id))
+        # Start listening in background and store task reference
+        task = asyncio.create_task(self._listen_to_redis(room_id))
+        self._listener_tasks[room_id] = task
 
     async def _unsubscribe_from_room(self, room_id: str):
-        """Unsubscribe from Redis channel."""
+        """Unsubscribe from Redis channel and cancel listener task."""
+        # Cancel listener task
+        if room_id in self._listener_tasks:
+            self._listener_tasks[room_id].cancel()
+            try:
+                await self._listener_tasks[room_id]
+            except asyncio.CancelledError:
+                pass  # Expected
+            del self._listener_tasks[room_id]
+
+        # Unsubscribe from Redis
         if self.pubsub:
             channel = f"room:{room_id}"
             await self.pubsub.unsubscribe(channel)
 
     async def _listen_to_redis(self, room_id: str):
         """Listen for messages from Redis and broadcast to local users."""
+        logger = logging.getLogger(__name__)
+        expected_channel = f"room:{room_id}".encode()  # Redis returns bytes
+
         try:
             async for message in self.pubsub.listen():
-                if message["type"] == "message":
+                # Only process messages for THIS room's channel
+                if (
+                    message["type"] == "message"
+                    and message.get("channel") == expected_channel
+                ):
                     data = json.loads(message["data"])
                     await self._send_to_local_connections(room_id, data)
-        except Exception as e:
-            print(f"Error in Redis listener for room {room_id}: {e}")
+        except asyncio.CancelledError:
+            pass  # Expected on unsubscribe
+        except Exception:
+            logger.exception(f"Error in Redis listener for room {room_id}")
 
     async def _send_to_local_connections(self, room_id: str, message: dict):
         """Send message to all local users in a room."""
